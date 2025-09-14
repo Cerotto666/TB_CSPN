@@ -2,18 +2,16 @@ import json
 import time
 import uuid
 from datetime import datetime
-from typing import Dict
 
-from assets import (create_agent, create_chain,
-                    AgentRole, Directive, choose_worker_tool)
+from assets.utils import create_agent, choose_worker_tool, parse_worker_log
+from assets.custom_obj import AgentState, AgentRole, Directive, WorkerLog
 from assets.helper import add_log_to_state, ROUTER_SUPERVISOR_NAME
 from langchain_openai import ChatOpenAI
-from assets import AgentState, Token
 from langgraph.types import Command
 from loguru import logger
 from langchain_community.callbacks import get_openai_callback
 
-from assets import group_scores
+from assets.utils import group_scores
 from assets.nodes.workers import restart_worker_tool, diagnostics_worker_tool, notify_team_worker_tool, \
     log_work_note_worker_tool
 from assets.prompts import TOOL_SUPERVISOR_PROMPT
@@ -90,7 +88,7 @@ def router_supervisor_node(state: AgentState) -> Command:
         goto=route
     )
 
-def tool_invocation_supervisor_node(state: "AgentState") -> Command:
+def tool_invocation_supervisor_node(state: AgentState) -> Command:
     logger.info("Entering the tool_invocation_supervisor node")
     start_time = time.perf_counter()
 
@@ -137,13 +135,22 @@ def tool_invocation_supervisor_node(state: "AgentState") -> Command:
             # variabili usate dal prompt
             "directive": directive_text,
             "directive_id": directive.id,
-            "incident_json": incident,
+            "incident_json": inc_dict,
             "topics": topics,
             "tool_name": tool_name
         })
 
     logger.debug(f"tool_invocation_supervisor agent result: {result}")
     state.directives = [directive]
+
+    logger.debug("------------------------------------------")
+    logger.debug(f"Creating worker log from supervisor node")
+    worker_log = parse_worker_log(result.get("output"))
+    if isinstance(worker_log, WorkerLog):
+        state.nodes_logs.setdefault("worker", []).append(worker_log)
+    else:
+        logger.warning(f"Worker log non valido, salvato come raw: {worker_log}")
+    logger.debug("------------------------------------------")
 
     state = add_log_to_state(
         agent_name="tool_invocation_supervisor",

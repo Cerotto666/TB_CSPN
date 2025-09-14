@@ -93,9 +93,12 @@ Topics:
 
 Rules:
 - You MUST call exactly one tool: {tool_name}.
-- Pass the full directive string in the tool input parameter.
-- Do NOT call any other tools. Do NOT add commentary.
-
-After the tool returns, reply ONLY with:
-{{"executed_tool": "{tool_name}", "status": "ok"}}
+- Pass both `directive` and `directive_id`.
+- After the tool returns, reply ONLY with a JSON object:
+  {{
+    "executed_tool": "{{tool_name}}",
+    "status": "ok",
+    "tool_output": <PASTE HERE VERBATIM the tool's raw JSON output>
+  }}
+Do not add explanations.
 """

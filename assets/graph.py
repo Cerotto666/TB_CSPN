@@ -1,13 +1,26 @@
 import uuid
-
-from langgraph.graph.state import StateGraph, START, END
+from langgraph.graph.state import StateGraph
 from langgraph.checkpoint.memory import MemorySaver
-from assets.helper import ROUTER_SUPERVISOR_NAME, INPUT_CONSULTANT_NAME
-from assets import *
-from assets.nodes import *
+from assets.custom_obj import AgentState, AgentRole, Incident
+from assets.nodes.consultants import (
+    input_consultant_node,
+    root_cause_consultant_node,
+    entity_graph_consultant_node,
+)
+from assets.nodes.supervisors import (
+    router_supervisor_node,
+    tool_invocation_supervisor_node,
+)
+from assets.helper.costants import (
+    INPUT_CONSULTANT_NAME,
+    ROUTER_SUPERVISOR_NAME,
+    ROOT_CAUSE_CONSULTANT_NAME,
+    ENTITY_GRAPH_CONSULTANT_NAME,
+    TOOL_INVOCATION_SUPERVISOR_NAME,
+)
 
-class IncidentsGraph():
-    def __init__(self):
+class IncidentsGraph:
+    def __init__(self, topics: set[str] | None = None):
         self.builder = StateGraph(AgentState)
         memory = MemorySaver()
 
@@ -25,9 +38,8 @@ class IncidentsGraph():
                 "configurable": {"thread_id": str(uuid.uuid4())}
             })
         )
-        topics = set(upload_topics())
         self.state = AgentState(
-            topics=topics,
+            topics=topics or set(),
             incident=None,
             token=None,
             directives=[],
@@ -52,16 +64,5 @@ class IncidentsGraph():
 
         return self.state
 
-if __name__=="__main__":
-    incidents = upload_json_incidents()
-    for inc in incidents:
-        state = AgentState(
-            topics=set(),
-            incident=Incident(**inc),
-            token=None,
-            nodes_logs=None
-        )
-        agent_graph = IncidentsGraph()
-        response = agent_graph.run(inc)
-        print(response)
-        break
+if __name__ == "__main__":
+    pass

@@ -13,10 +13,11 @@ from langchain_core.output_parsers import StrOutputParser
 from decouple import config
 from langchain_core.runnables import RunnableSerializable
 
-from assets.custom_obj import AgentState
+from assets.custom_obj import AgentState, BaseLog, WorkerLog
 
 from langgraph.types import Command
 from loguru import logger
+
 
 AgentLike = Union[AgentExecutor, RunnableSerializable[dict, Any]]
 def create_agent(llm: BaseChatModel, tools: list, system_prompt: str) -> AgentExecutor:
@@ -167,5 +168,32 @@ def choose_worker_tool(topics: Dict[str, float], incident: Dict) -> Tuple[str, f
     conf = max(t.get("incident_management", 0.0), 0.50)
     return "log_work_note_worker", conf, "fallback to work note"
 
-if __name__=="__main__":
-    save_topics({"a":1,"b":2})
+def parse_worker_log(raw_output: str | dict) -> WorkerLog | dict | None:
+    """
+    Prova a costruire un WorkerLog dal tool output.
+    Se non riesce, ritorna un dict con 'raw_output' o None.
+    """
+    if isinstance(raw_output, str):
+        try:
+            data = json.loads(raw_output)
+        except json.JSONDecodeError:
+            return {"raw_output": raw_output}
+    elif isinstance(raw_output, dict):
+        data = raw_output
+    else:
+        return {"raw_output": str(raw_output)}
+
+    tool_output = data.get("tool_output", data)
+
+    if isinstance(tool_output, dict):
+        try:
+            return WorkerLog.model_validate(tool_output)
+        except Exception as e:
+            logger.error(f"WorkerLog validation failed: {e}")
+            return {"raw_output": tool_output}
+    else:
+        return {"raw_output": str(tool_output)}
+
+
+if __name__ == "__main__":
+    save_topics({"a": 1, "b": 2})

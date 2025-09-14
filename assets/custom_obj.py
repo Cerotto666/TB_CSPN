@@ -1,9 +1,9 @@
 import time
-from dataclasses import dataclass
+
 from datetime import datetime
-from enum import IntEnum, StrEnum
-from typing import Optional, List, Dict, Any, Set
-from typing import Annotated, Sequence, TypedDict
+from enum import StrEnum
+from typing import Optional, List, Dict, Any
+from typing import Annotated
 import operator
 
 from pydantic import BaseModel
@@ -58,7 +58,7 @@ class SupervisorLog(BaseLog):
 class WorkerLog(BaseLog):
     directive_id: str
     action: str
-    success: bool
+    success: str
     timestamp: datetime
 
 
@@ -70,10 +70,19 @@ class AgentRole(StrEnum):
 
 class AgentState(BaseModel):
     topics: Annotated[set[str], operator.or_]
+    
     incident: Optional[Incident] = None
     token: Optional[Token] = None
     directives: Optional[List[Directive]] = None
-    nodes_logs: Optional[Dict[str, List[Any]]]
+    nodes_logs: Optional[Dict[str, List[BaseLog]]]
+
+class Processed_Logs(BaseModel):
+    final_cost: float
+    total_llm_calls: int
+    total_time: int
+    total_items: int
+    total_success_rate: float
+    throughput_per_min: float
 
 if __name__=="__main__":
     print(time.time())
