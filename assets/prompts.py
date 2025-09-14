@@ -102,3 +102,63 @@ Rules:
   }}
 Do not add explanations.
 """
+
+ROUTER_SUPERVISOR_PROMPT = """
+You are the Router Supervisor. Your task is to choose ONE route for the next node.
+
+Context:
+- Topics is a JSON object mapping topic -> score in [0, 1].
+- The two macro-groups are:
+  - Root-cause group: ["root_cause", "deployment", "config", "database", "network"]
+  - Entity-graph group: ["entity_graph", "incident_management", "notification_required", "dependency", "diagnostics"]
+
+Decision policy (follow strictly):
+1) Compute rc_score as the max score among the root-cause group topics present in Topics (0 if none).
+2) Compute eg_score as the max score among the entity-graph group topics present in Topics (0 if none).
+3) ROUTE_MIN = 0.50, MARGIN = 0.10
+   - If rc_score < ROUTE_MIN AND eg_score < ROUTE_MIN: route = "entity_graph_consultant", reason = "weak signals"
+   - Else if rc_score > eg_score + MARGIN: route = "root_cause_consultant", reason = "root-cause dominance: {{rc_top}}={{rc_score}}"
+   - Else if eg_score > rc_score + MARGIN: route = "entity_graph_consultant", reason = "entity-graph dominance: {{eg_top}}={{eg_score}}"
+   - Else (tie): route = "entity_graph_consultant", reason = "tie"
+4) confidence = the selected macro-score (rc_score if route=root_cause_consultant else eg_score).
+5) Also include rc_top and eg_top as the topic names achieving rc_score and eg_score (omit if none).
+
+Return ONLY a valid JSON object with keys:
+{{
+  "route": "root_cause_consultant" | "entity_graph_consultant",
+  "reason": "<short reason>",
+  "confidence": <float 0..1>,
+  "rc_score": <float 0..1>,
+  "eg_score": <float 0..1>,
+  "rc_top": "<topic or null>",
+  "eg_top": "<topic or null>"
+}}
+
+Do not add explanations. Do not include extra fields.
+Topics:
+{topics_json}
+"""
+
+TOOL_INVOCATION_SUPERVISOR_PROMPT = """
+You are the Tool Decider. Decide exactly ONE tool to execute.
+
+Context (read-only):
+- Incident JSON: {incident_json}
+- Topics: {topics}
+- Available tools: {available_tools}   # lista di nomi esatti
+
+Rules:
+- Select exactly one tool from Available tools.
+- Choose the tool that best progresses investigation/diagnostics given Incident and Topics.
+- Set confidence in [0,1].
+- Provide a short reason.
+- Return ONLY a JSON object with keys:
+  {{
+    "tool_name": "<one of {available_tools}>",
+    "confidence": <float 0..1>,
+    "reason": "<short reason>",
+    "args": {{}}   # optional; include only if needed
+  }}
+
+Do not add commentary or extra fields.
+"""

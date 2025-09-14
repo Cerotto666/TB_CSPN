@@ -11,7 +11,7 @@ logs: List[Dict[str, Dict[str, List[BaseLog]]]] = []
 # ...Dict[str,List[BaseLog]]... -> Ogni chiave relativa al ruolo contiene una lista di log specifici del ruolo, tutti estensioni di BaseLog
 
 def main():
-    print_summary(log_processing(process_input()), style="pretty")
+    print_summary(log_processing(process_input()), style="table")
 
 
 if __name__=="__main__":

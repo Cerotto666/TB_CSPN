@@ -1,1 +1,1 @@
-capacity,restart_candidate,dependency,latency,database,network,auth,config,notification_required,diagnostics,availability,deployment,incident_management
+network,deployment,auth,latency,dependency,database,availability,incident_management,capacity,config,diagnostics,restart_candidate,notification_required

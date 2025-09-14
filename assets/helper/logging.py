@@ -118,7 +118,7 @@ def log_processing(logs: List[Dict[str, Dict[str, List[BaseLog]]]]) -> Processed
 
         total_items += 1
 
-    total_time_in_minutes = max(total_time // 60000, 1)
+    total_time_in_minutes = total_time / 60000
     total_success_rate = (total_success / total_items) * 100
     throughput_per_min = total_items / total_time_in_minutes
     processed_logs = Processed_Logs(
@@ -145,7 +145,7 @@ def print_summary(logs: Processed_Logs, style: Literal["simple", "table", "prett
 
     if style == "simple":
         logger.info("=== Processing Summary ===")
-        logger.info(f"Final cost:                 {logs.final_cost:.2f}")
+        logger.info(f"Final cost:                 {logs.final_cost:.10f}")
         logger.info(f"Total LLM calls:            {logs.total_llm_calls}")
         logger.info(f"Total execution time:       {logs.total_time} ms")
         logger.info(f"Total processed items:      {logs.total_items}")
@@ -156,7 +156,7 @@ def print_summary(logs: Processed_Logs, style: Literal["simple", "table", "prett
     elif style == "table":
         output = (
             "\n=== Processing Summary ===\n"
-            f"{'Final cost:':25}{logs.final_cost:.2f}\n"
+            f"{'Final cost:':25}{logs.final_cost:.10f}\n"
             f"{'Total LLM calls:':25}{logs.total_llm_calls}\n"
             f"{'Execution time (ms):':25}{logs.total_time}\n"
             f"{'Processed items:':25}{logs.total_items}\n"
@@ -168,7 +168,7 @@ def print_summary(logs: Processed_Logs, style: Literal["simple", "table", "prett
 
     elif style == "pretty":
         summary = [
-            ["Final cost", f"{logs.final_cost:.2f}"],
+            ["Final cost", f"{logs.final_cost:.10f}"],
             ["Total LLM calls", logs.total_llm_calls],
             ["Execution time (ms)", logs.total_time],
             ["Processed items", logs.total_items],
