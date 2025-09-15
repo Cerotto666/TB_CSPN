@@ -21,7 +21,8 @@ def restart_worker_tool(directive: str, directive_id: str) -> Dict[str, Any]:
     Returns:
         The json representation of the worker log.
     """
-    logger.info(f"[restart_worker] id={directive_id} directive={directive}")
+    logger.info("-" * 50)
+    logger.warning("Entering the restart_worker_tool")
     worker_log = worker_log_factory(
         node_name=DIAGNOSTIC_WORKER_NAME,
         processing_time=random.randint(50, 200),
@@ -33,6 +34,8 @@ def restart_worker_tool(directive: str, directive_id: str) -> Dict[str, Any]:
         success="ok",
         timestamp=datetime.now()
     )
+    logger.info(f"[restart_worker] id={directive_id} directive={directive}")
+    logger.info("-"*50)
     return worker_log.model_dump(mode="json")
 
 
@@ -47,6 +50,8 @@ def diagnostics_worker_tool(directive: str, directive_id: str) -> Dict[str, Any]
     Returns:
         The json representation of the worker log
     """
+    logger.info("-" * 50)
+    logger.warning("Entering the diagnostics_worker_tool")
     worker_log = worker_log_factory(
         node_name=DIAGNOSTIC_WORKER_NAME,
         processing_time=random.randint(50, 200),
@@ -60,6 +65,7 @@ def diagnostics_worker_tool(directive: str, directive_id: str) -> Dict[str, Any]
     )
 
     logger.info(f"[diagnostics_worker] id={directive_id} directive={directive}")
+    logger.info("-"*50)
     return worker_log.model_dump(mode="json")
 
 
@@ -74,6 +80,8 @@ def notify_team_worker_tool(directive: str, directive_id: str) -> Dict[str, Any]
     Returns:
         The json representation of the worker log
     """
+    logger.info("-" * 50)
+    logger.warning("Entering the notify_team_worker_tool")
     worker_log = worker_log_factory(
         node_name=NOTIFY_TEAM_WORKER_NAME,
         processing_time=random.randint(50, 200),
@@ -86,6 +94,7 @@ def notify_team_worker_tool(directive: str, directive_id: str) -> Dict[str, Any]
         timestamp=datetime.now()
     )
     logger.info(f"[notify_team_worker] id={directive_id} directive={directive}")
+    logger.info("-"*50)
     return worker_log.model_dump(mode="json")
 
 
@@ -101,6 +110,8 @@ def log_work_note_worker_tool(directive: str, directive_id: str) -> Dict[str, An
     Returns:
         The json representation of the worker log
     """
+    logger.info("-" * 50)
+    logger.warning("Entering the log_work_note_worker_tool")
     worker_log = worker_log_factory(
         node_name=LOG_WORK_NOTE_WORKER_NAME,
         processing_time=random.randint(50, 200),
@@ -113,4 +124,5 @@ def log_work_note_worker_tool(directive: str, directive_id: str) -> Dict[str, An
         timestamp=datetime.now()
     )
     logger.info(f"[log_work_note_worker] id={directive_id} directive={directive}")
+    logger.info("-" * 50)
     return worker_log.model_dump(mode="json")
