@@ -71,6 +71,7 @@ def input_consultant_node(state: AgentState) -> Command:
     )
 
 def root_cause_consultant_node(state: "AgentState") -> Command:
+    LLM = ChatOpenAI(model=state.model, temperature=state.temperature)
     logger.warning("Entering the root_cause_consultant node")
     start_time = time.perf_counter()
 
