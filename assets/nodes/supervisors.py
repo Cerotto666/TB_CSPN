@@ -5,10 +5,12 @@ from datetime import datetime
 
 from openai import APIError
 
+from assets.helper.costants import RESTART_WORKER_NAME, DIAGNOSTIC_WORKER_NAME, NOTIFY_TEAM_WORKER_NAME, \
+    LOG_WORK_NOTE_WORKER_NAME, ROUTER_SUPERVISOR_NAME, TOOL_INVOCATION_SUPERVISOR_NAME
+from assets.helper.logging import add_log_to_state
 from assets.utils import create_agent, choose_worker_tool, parse_worker_log, create_chain
 from assets.custom_obj import AgentState, AgentRole, Directive, WorkerLog
-from assets.helper import add_log_to_state, ROUTER_SUPERVISOR_NAME, TOOL_INVOCATION_SUPERVISOR_NAME, \
-    RESTART_WORKER_NAME, DIAGNOSTIC_WORKER_NAME, NOTIFY_TEAM_WORKER_NAME, LOG_WORK_NOTE_WORKER_NAME
+
 from assets.prompts import ROUTER_SUPERVISOR_PROMPT, TOOL_INVOCATION_SUPERVISOR_PROMPT
 from langchain_openai import ChatOpenAI
 from langgraph.types import Command
@@ -52,7 +54,7 @@ def router_supervisor_deterministic(topics):
             reason = f"tie (rc={rc_score:.2f}, eg={eg_score:.2f}) → prefer entity"
     return llm_count, cb, route, reason, rc_score, eg_score
 
-def router_supervisor_node(state: AgentState, llm_call: str = True) -> Command:
+def router_supervisor_node(state: AgentState) -> Command:
     #@TODO rivedere il sistema di soglie rispetto ai topic, introdurre elementi di dinamismo
     #@TODO meccanismo di validazione di nuovi topic -> esportare i dati su file per la gestione dinamica
 
@@ -62,7 +64,7 @@ def router_supervisor_node(state: AgentState, llm_call: str = True) -> Command:
     start_time = time.perf_counter()
     topics = state.token.topics
 
-    if llm_call:
+    if state.llm_supervisor:
         logger.info(f"Using LLM in router supervisor node")
         topics_json = json.dumps(topics, ensure_ascii=False)
         chain = create_chain(LLM, ROUTER_SUPERVISOR_PROMPT)
@@ -123,7 +125,7 @@ def router_supervisor_node(state: AgentState, llm_call: str = True) -> Command:
         },
         goto=route
     )
-def tool_invocation_supervisor_node(state: AgentState, llm_call: bool = True) -> Command:
+def tool_invocation_supervisor_node(state: AgentState) -> Command:
 
     LLM = ChatOpenAI(model=state.model, temperature=state.temperature, max_retries=3, streaming=False)
 
@@ -138,7 +140,7 @@ def tool_invocation_supervisor_node(state: AgentState, llm_call: bool = True) ->
         by_alias=True,
     )
     with get_openai_callback() as cb:
-        if llm_call:
+        if state.llm_supervisor:
             logger.info(f"Using LLM in tool invocation supervisor node")
             available_tools = list(TOOL_REGISTRY.keys())
             chain = create_chain(LLM, TOOL_INVOCATION_SUPERVISOR_PROMPT)
