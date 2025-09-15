@@ -18,7 +18,7 @@ from langchain_community.callbacks import get_openai_callback
 
 
 def input_consultant_node(state: AgentState) -> Command:
-    LLM = ChatOpenAI(model=state.model, temperature=state.temperature)
+    LLM = ChatOpenAI(model=state.model, temperature=state.temperature, max_retries=3, streaming=False)
 
     logger.warning("Entering the input consultant node")
     start_time = time.perf_counter()
@@ -71,7 +71,7 @@ def input_consultant_node(state: AgentState) -> Command:
     )
 
 def root_cause_consultant_node(state: "AgentState") -> Command:
-    LLM = ChatOpenAI(model=state.model, temperature=state.temperature)
+    LLM = ChatOpenAI(model=state.model, temperature=state.temperature, max_retries=3, streaming=False)
     logger.warning("Entering the root_cause_consultant node")
     start_time = time.perf_counter()
 
@@ -134,7 +134,7 @@ def root_cause_consultant_node(state: "AgentState") -> Command:
     )
 
 def entity_graph_consultant_node(state: "AgentState") -> Command:
-    LLM = ChatOpenAI(model=state.model, temperature=state.temperature)
+    LLM = ChatOpenAI(model=state.model, temperature=state.temperature, max_retries=3, streaming=False)
     logger.warning("Entering the entity_graph_consultant node")
     start_time = time.perf_counter()
 
