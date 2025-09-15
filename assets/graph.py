@@ -20,7 +20,7 @@ from assets.helper.costants import (
 )
 
 class IncidentsGraph:
-    def __init__(self, topics: set[str] | None = None):
+    def __init__(self, llm_call: bool, topics: set[str] | None = None):
         self.builder = StateGraph(AgentState)
         memory = MemorySaver()
 
@@ -40,6 +40,7 @@ class IncidentsGraph:
         )
         self.state = AgentState(
             topics=topics or set(),
+            llm_supervisor=llm_call,
             incident=None,
             token=None,
             directives=[],

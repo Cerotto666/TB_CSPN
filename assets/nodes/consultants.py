@@ -14,11 +14,13 @@ from loguru import logger
 from langchain_community.callbacks import get_openai_callback
 
 
-LLM = ChatOpenAI(model="gpt-4o-mini")
+
 
 
 def input_consultant_node(state: AgentState) -> Command:
-    logger.info("Entering the input consultant node")
+    LLM = ChatOpenAI(model=state.model, temperature=state.temperature)
+
+    logger.warning("Entering the input consultant node")
     start_time = time.perf_counter()
     chain = create_chain(LLM, INPUT_CONSULTANT_PROMPT)
     input = {
@@ -28,13 +30,13 @@ def input_consultant_node(state: AgentState) -> Command:
     with get_openai_callback() as cb:
         result = chain.invoke(input, config={"callbacks": [cb]})
 
-    logger.debug(f"Consultant node results: {result}")
+    logger.info(f"Consultant node results: {result}")
     try:
         result_json = json.loads(result) if isinstance(result, str) else result
         if not isinstance(result_json, dict):
             result_json = {}
     except Exception as e:
-        logger.warning(f"Failed to parse RC consultant JSON: {e}")
+        logger.error(f"Failed to parse RC consultant JSON: {e}")
         result_json = {}
     token = Token(
         id=str(uuid.uuid4()),
@@ -58,6 +60,7 @@ def input_consultant_node(state: AgentState) -> Command:
         llm_callback=cb,
         state=state
     )
+    logger.info("-"*50)
     return Command(
         update={
             "nodes_logs": state.nodes_logs,
@@ -68,7 +71,7 @@ def input_consultant_node(state: AgentState) -> Command:
     )
 
 def root_cause_consultant_node(state: "AgentState") -> Command:
-    logger.info("Entering the root_cause_consultant node")
+    logger.warning("Entering the root_cause_consultant node")
     start_time = time.perf_counter()
 
     chain = create_chain(LLM, ROOT_CAUSE_CONSULTANT_PROMPT)
@@ -80,14 +83,14 @@ def root_cause_consultant_node(state: "AgentState") -> Command:
     with get_openai_callback() as cb:
         result = chain.invoke(input, config={"callbacks": [cb]})
 
-    logger.debug(f"Root-cause consultant raw result: {result}")
+    logger.info(f"Root-cause consultant raw result: {result}")
 
     try:
         result_json = json.loads(result) if isinstance(result, str) else result
         if not isinstance(result_json, dict):
             result_json = {}
     except Exception as e:
-        logger.warning(f"Failed to parse RC consultant JSON: {e}")
+        logger.error(f"Failed to parse RC consultant JSON: {e}")
         result_json = {}
 
     # Merge topic scores (mantieni gli score)
@@ -119,7 +122,7 @@ def root_cause_consultant_node(state: "AgentState") -> Command:
         llm_callback=cb,
         state=state
     )
-
+    logger.info("-"*50)
     return Command(
         update={
             "nodes_logs": state.nodes_logs,
@@ -130,7 +133,8 @@ def root_cause_consultant_node(state: "AgentState") -> Command:
     )
 
 def entity_graph_consultant_node(state: "AgentState") -> Command:
-    logger.info("Entering the entity_graph_consultant node")
+    LLM = ChatOpenAI(model=state.model, temperature=state.temperature)
+    logger.warning("Entering the entity_graph_consultant node")
     start_time = time.perf_counter()
 
     chain = create_chain(LLM, ENTITY_GRAPH_CONSULTANT_PROMPT)
@@ -142,14 +146,14 @@ def entity_graph_consultant_node(state: "AgentState") -> Command:
     with get_openai_callback() as cb:
         result = chain.invoke(input, config={"callbacks": [cb]})
 
-    logger.debug(f"Entity-graph consultant raw result: {result}")
+    logger.info(f"Entity-graph consultant raw result: {result}")
 
     try:
         result_json = json.loads(result) if isinstance(result, str) else result
         if not isinstance(result_json, dict):
             result_json = {}
     except Exception as e:
-        logger.warning(f"Failed to parse EG consultant JSON: {e}")
+        logger.error(f"Failed to parse EG consultant JSON: {e}")
         result_json = {}
 
     merged_topics = merge_topic_scores(state.token.topics, result_json)
@@ -179,7 +183,7 @@ def entity_graph_consultant_node(state: "AgentState") -> Command:
         llm_callback=cb,
         state=state
     )
-
+    logger.info("-"*50)
     return Command(
         update={
             "nodes_logs": state.nodes_logs,

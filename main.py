@@ -1,5 +1,10 @@
+import sys
 from typing import List, Dict
+
+from loguru import logger
+
 from assets.custom_obj import BaseLog
+from assets.helper.config_helper import load_settings, log_settings
 from assets.run import process_input
 from assets.helper import log_processing, print_summary
 
@@ -11,7 +16,18 @@ logs: List[Dict[str, Dict[str, List[BaseLog]]]] = []
 # ...Dict[str,List[BaseLog]]... -> Ogni chiave relativa al ruolo contiene una lista di log specifici del ruolo, tutti estensioni di BaseLog
 
 def main():
-    print_summary(log_processing(process_input()), style="table")
+    settings = load_settings()
+    log_settings(settings)
+    logger.remove()
+    logger.add(sys.stderr, level=settings.log_level.upper())
+    print_summary(
+        log_processing(
+            process_input(
+                settings.llm_call,
+                settings.n_items
+            )
+        ),
+        settings)
 
 
 if __name__=="__main__":

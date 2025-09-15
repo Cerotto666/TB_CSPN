@@ -2,7 +2,6 @@ import json
 import time
 import uuid
 from datetime import datetime
-
 from assets.utils import create_agent, choose_worker_tool, parse_worker_log, create_chain
 from assets.custom_obj import AgentState, AgentRole, Directive, WorkerLog
 from assets.helper import add_log_to_state, ROUTER_SUPERVISOR_NAME, TOOL_INVOCATION_SUPERVISOR_NAME, \
@@ -18,7 +17,6 @@ from assets.nodes.workers import restart_worker_tool, diagnostics_worker_tool, n
     log_work_note_worker_tool
 from assets.prompts import TOOL_SUPERVISOR_PROMPT
 
-LLM = ChatOpenAI(model="gpt-4o-mini")
 
 TOOL_REGISTRY = {
     RESTART_WORKER_NAME: restart_worker_tool,
@@ -31,7 +29,9 @@ def router_supervisor_node(state: AgentState, llm_call: str = True) -> Command:
     #@TODO rivedere il sistema di soglie rispetto ai topic, introdurre elementi di dinamismo
     #@TODO meccanismo di validazione di nuovi topic -> esportare i dati su file per la gestione dinamica
 
-    logger.info("Entering the router supervisor node")
+    LLM = ChatOpenAI(model=state.model, temperature=state.temperature)
+
+    logger.warning("Entering the router supervisor node")
     ROUTE_MIN = 0.50  # conf. minima per considerare “forte” un segnale
     MARGIN = 0.10
     start_time = time.perf_counter()
@@ -46,13 +46,13 @@ def router_supervisor_node(state: AgentState, llm_call: str = True) -> Command:
         }
         with get_openai_callback() as cb:
             result = chain.invoke(input, config={"callbacks": [cb]})
-        logger.debug(f"Router supervisor node results: {result}")
+        logger.info(f"Router supervisor node results: {result}")
         try:
             result_json = json.loads(result) if isinstance(result, str) else result
             if not isinstance(result_json, dict):
                 result_json = {}
         except Exception as e:
-            logger.warning(f"Failed to parse RC consultant JSON: {e}")
+            logger.error(f"Failed to parse RC consultant JSON: {e}")
             result_json = {}
         route = result_json.get("route", "entity_graph_consultant")
         reason = result_json.get("reason", "")
@@ -60,7 +60,8 @@ def router_supervisor_node(state: AgentState, llm_call: str = True) -> Command:
         eg_score = result_json.get("eg_score", 0)
         llm_count = True
     else:
- # margine per discriminare tra i due punteggi
+        # margine per discriminare tra i due punteggi
+        logger.info(f"Using NO LLM in router supervisor node")
         rc_score, eg_score, rc_top, eg_top = group_scores(topics or {})
         # Decision policy
         llm_count = False
@@ -104,6 +105,7 @@ def router_supervisor_node(state: AgentState, llm_call: str = True) -> Command:
         llm_callback=cb,
         state=state
     )
+    logger.info("-"*50)
     return Command(
         update={
             "nodes_logs": state.nodes_logs,
@@ -111,72 +113,73 @@ def router_supervisor_node(state: AgentState, llm_call: str = True) -> Command:
         },
         goto=route
     )
+def tool_invocation_supervisor_node(state: AgentState, llm_call: bool = True) -> Command:
 
-def tool_invocation_supervisor_node(state: AgentState, llm_call: str = True) -> Command:
-    logger.info("Entering the tool_invocation_supervisor node")
+    LLM = ChatOpenAI(model=state.model, temperature=state.temperature)
+
+    logger.warning("Entering the tool_invocation_supervisor node")
     start_time = time.perf_counter()
 
-    # 1) Scegli il tool
     topics = state.token.topics
     incident = state.incident
     inc_dict = incident.model_dump(
         mode="python",
         exclude_none=True,
-        by_alias=True
+        by_alias=True,
     )
-
-    if llm_call:
-        logger.info(f"Using LLM in tool invocation supervisor node")
-        available_tools = list(TOOL_REGISTRY.keys())
-        chain = create_chain(LLM, TOOL_INVOCATION_SUPERVISOR_PROMPT)
-        input = {
-            "incident_json": inc_dict,
-            "topics": topics,
-            "available_tools": available_tools
-        }
-        with get_openai_callback() as cb:
-            result = chain.invoke(input, config={"callbacks": [cb]})
-        logger.debug(f"Tool invocation supervisor node results: {result}")
-        try:
-            result_json = json.loads(result) if isinstance(result, str) else result
-            if not isinstance(result_json, dict):
-                result_json = {}
-        except Exception as e:
-            logger.warning(f"Failed to parse RC consultant JSON: {e}")
-            result_json = {}
-        tool_name = result_json.get("tool_name", LOG_WORK_NOTE_WORKER_NAME)
-        confidence = result_json.get("confidence",0)
-        reason = result_json.get("reason", "No reason available")
-    else:
-        tool_name, confidence, reason = choose_worker_tool(topics, inc_dict)
-
-
-    directive_text = f"[Directive] Execute tool '{tool_name}' for incident {incident.id}. "
-
-    directive = Directive(
-        id=str(uuid.uuid4()),
-        action=directive_text,
-        confidence=confidence,
-        source_token_id=getattr(state.token, "id", None),
-        timestamp=datetime.now(),
-        metadata={
-            "selected_tool": tool_name,
-            "directive_text": directive_text,
-            "directive_reason": reason if reason else "Reason not detected",
-            "processing_time": time.perf_counter() - start_time,
-        },
-    )
-    logger.info(f"Directive created with ID: {directive.id} → tool={tool_name}")
-    logger.info(f"Reason: {directive.metadata['directive_reason']}")
-
-    tool_obj = TOOL_REGISTRY[tool_name]
-    agent = create_agent(
-        llm=LLM,
-        tools=[tool_obj],
-        system_prompt=TOOL_SUPERVISOR_PROMPT,
-    )
-
     with get_openai_callback() as cb:
+        if llm_call:
+            logger.info(f"Using LLM in tool invocation supervisor node")
+            available_tools = list(TOOL_REGISTRY.keys())
+            chain = create_chain(LLM, TOOL_INVOCATION_SUPERVISOR_PROMPT)
+            input = {
+                "incident_json": inc_dict,
+                "topics": topics,
+                "available_tools": available_tools
+            }
+            result = chain.invoke(input, config={"callbacks": [cb]})
+            logger.info(f"Tool invocation supervisor node results: {result}")
+            try:
+                result_json = json.loads(result) if isinstance(result, str) else result
+                if not isinstance(result_json, dict):
+                    result_json = {}
+            except Exception as e:
+                logger.error(f"Failed to parse RC consultant JSON: {e}")
+                result_json = {}
+            tool_name = result_json.get("tool_name", LOG_WORK_NOTE_WORKER_NAME)
+            confidence = result_json.get("confidence",0)
+            reason = result_json.get("reason", "No reason available")
+            directive_text = result_json.get("directive_text", f"[Directive] Execute tool '{tool_name}' for incident {incident.id}. ")
+        else:
+            logger.info(f"Using NO-LLM in tool invocation supervisor node")
+            tool_name, confidence, reason = choose_worker_tool(topics, inc_dict)
+            directive_text = f"[Directive] Execute tool '{tool_name}' for incident {incident.id}. "
+
+
+
+        directive = Directive(
+            id=str(uuid.uuid4()),
+            action=directive_text,
+            confidence=confidence,
+            source_token_id=getattr(state.token, "id", None),
+            timestamp=datetime.now(),
+            metadata={
+                "selected_tool": tool_name,
+                "directive_text": directive_text,
+                "directive_reason": reason if reason else "Reason not detected",
+                "processing_time": time.perf_counter() - start_time,
+            },
+        )
+        logger.info(f"Directive created with ID: {directive.id} → tool={tool_name}")
+        logger.info(f"Reason: {directive.metadata['directive_reason']}")
+
+        tool_obj = TOOL_REGISTRY[tool_name]
+        agent = create_agent(
+            llm=LLM,
+            tools=[tool_obj],
+            system_prompt=TOOL_SUPERVISOR_PROMPT,
+        )
+
         result = agent.invoke({
             # molti agent executor richiedono 'input'
             "input": directive_text,
@@ -187,19 +190,17 @@ def tool_invocation_supervisor_node(state: AgentState, llm_call: str = True) -> 
             "topics": topics,
             "tool_name": tool_name
         })
+        logger.debug(f"tool_invocation_supervisor agent result: {result}")
+        logger.debug("------------------------------------------")
+        logger.debug(f"Creating worker log from supervisor node")
+        worker_log = parse_worker_log(result.get("output"))
+        if isinstance(worker_log, WorkerLog):
+            state.nodes_logs.setdefault("worker", []).append(worker_log)
+        else:
+            logger.error(f"Worker log non valido, salvato come raw: {worker_log}")
+        logger.debug("------------------------------------------")
 
-    logger.debug(f"tool_invocation_supervisor agent result: {result}")
     state.directives = [directive]
-
-    logger.debug("------------------------------------------")
-    logger.debug(f"Creating worker log from supervisor node")
-    worker_log = parse_worker_log(result.get("output"))
-    if isinstance(worker_log, WorkerLog):
-        state.nodes_logs.setdefault("worker", []).append(worker_log)
-    else:
-        logger.warning(f"Worker log non valido, salvato come raw: {worker_log}")
-    logger.debug("------------------------------------------")
-
     state = add_log_to_state(
         agent_name=TOOL_INVOCATION_SUPERVISOR_NAME,
         agent_role=AgentRole.supervisor.value,
@@ -215,4 +216,5 @@ def tool_invocation_supervisor_node(state: AgentState, llm_call: str = True) -> 
         "last_executed_tool": tool_name,
         "last_tool_result": result.get("output", result),
     }
+    logger.info("-"*50)
     return Command(update=update, goto="__end__")

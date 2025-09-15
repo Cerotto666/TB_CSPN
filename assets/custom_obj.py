@@ -2,11 +2,11 @@ import time
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from typing import Annotated
 import operator
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Incident(BaseModel):
@@ -70,11 +70,13 @@ class AgentRole(StrEnum):
 
 class AgentState(BaseModel):
     topics: Annotated[set[str], operator.or_]
-    
+    llm_supervisor: bool = False
     incident: Optional[Incident] = None
     token: Optional[Token] = None
     directives: Optional[List[Directive]] = None
     nodes_logs: Optional[Dict[str, List[BaseLog]]]
+    temperature: Optional[float] = 0.5
+    model: Optional[str] = "gpt-4o-mini"
 
 class Processed_Logs(BaseModel):
     final_cost: float
@@ -83,6 +85,9 @@ class Processed_Logs(BaseModel):
     total_items: int
     total_success_rate: float
     throughput_per_min: float
+
+
+
 
 if __name__=="__main__":
     print(time.time())

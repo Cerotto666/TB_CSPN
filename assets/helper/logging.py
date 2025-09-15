@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import json
 import random
 import time
 from datetime import datetime
-from typing import Any, List, Dict, Literal
+from typing import Any, List, Dict, Literal, Sequence
 from tabulate import tabulate
 from langchain_community.callbacks import OpenAICallbackHandler
 from loguru import logger
 
+from assets import save_run_to_file
 from assets.custom_obj import (
     AgentRole,
     AgentState,
@@ -17,6 +19,8 @@ from assets.custom_obj import (
     WorkerLog,
     Processed_Logs,
 )
+from assets.helper.config_helper import AppSettings
+
 
 def worker_log_factory(
     node_name: str,
@@ -50,7 +54,7 @@ def add_log_to_state(
         llm_callback: OpenAICallbackHandler|None,
         **role_specific_info:Any
 ) -> AgentState | WorkerLog | None:
-    logger.info(f"Adding {agent_name} log to state")
+    logger.debug(f"Adding {agent_name} log to state")
     log = BaseLog(
         node_name=agent_name,
         processing_time=round((time.perf_counter() - start_time) * 1000),
@@ -67,7 +71,7 @@ def add_log_to_state(
                 input_length=len(state.token.content)
             )
             state.nodes_logs[AgentRole.consultant.value].append(consultant_log)
-            logger.info("Consultant log added successfully")
+            logger.debug("Consultant log added successfully")
             return state
         case AgentRole.supervisor.value:
             supervisor_log = SupervisorLog(
@@ -79,7 +83,7 @@ def add_log_to_state(
                 timestamp=datetime.now()
             )
             state.nodes_logs[AgentRole.supervisor.value].append(supervisor_log)
-            logger.info("Supervisor log added successfully")
+            logger.debug("Supervisor log added successfully")
             return state
         case AgentRole.worker.value:
             data = log.model_dump()
@@ -99,6 +103,7 @@ def add_log_to_state(
             pass
 
 def log_processing(logs: List[Dict[str, Dict[str, List[BaseLog]]]]) -> Processed_Logs:
+    logger.debug("Entering the log processing function")
     final_cost = 0
     total_llm_calls = 0
     total_time = 0
@@ -107,7 +112,7 @@ def log_processing(logs: List[Dict[str, Dict[str, List[BaseLog]]]]) -> Processed
     # Per ogni incident
     for i, log in enumerate(logs):
         log_value = log[f'Inc{i}']
-        logger.info(log_value)
+        logger.debug(log_value)
         for role, entries in log_value.items():
             for entry in entries:
                 final_cost += entry.total_cost
@@ -131,11 +136,12 @@ def log_processing(logs: List[Dict[str, Dict[str, List[BaseLog]]]]) -> Processed
     )
     return processed_logs
 
-def print_summary(logs: Processed_Logs, style: Literal["simple", "table", "pretty"] = "simple") -> None:
+def print_summary(logs: Processed_Logs, settings: AppSettings) -> None:
     """
     Stampa un riepilogo dei log processati in diversi formati usando loguru.
 
     Args:
+        settings: the settings parameter from yml file
         logs: Oggetto Processed_Logs con i dati aggregati.
         style: Tipo di output:
                - "simple" : output leggibile e allineato
@@ -143,17 +149,18 @@ def print_summary(logs: Processed_Logs, style: Literal["simple", "table", "prett
                - "pretty" : tabella con tabulate (richiede libreria esterna)
     """
 
-    if style == "simple":
-        logger.info("=== Processing Summary ===")
-        logger.info(f"Final cost:                 {logs.final_cost:.10f}")
-        logger.info(f"Total LLM calls:            {logs.total_llm_calls}")
-        logger.info(f"Total execution time:       {logs.total_time} ms")
-        logger.info(f"Total processed items:      {logs.total_items}")
-        logger.info(f"Total success rate:         {logs.total_success_rate:.2f}%")
-        logger.info(f"Items processed per minute: {logs.throughput_per_min:.2f}")
-        logger.info("===========================")
-
-    elif style == "table":
+    if settings.style == "simple":
+        output = (
+            "=== Processing Summary ===\n"
+            f"Final cost:                 {logs.final_cost:.10f}\n"
+            f"Total LLM calls:            {logs.total_llm_calls}\n"
+            f"Total execution time:       {logs.total_time} ms\n"
+            f"Total processed items:      {logs.total_items}\n"
+            f"Total success rate:         {logs.total_success_rate:.2f}%\n"
+            f"Items processed per minute: {logs.throughput_per_min:.2f}\n"
+            "===========================\n"
+        )
+    elif settings.style == "table":
         output = (
             "\n=== Processing Summary ===\n"
             f"{'Final cost:':25}{logs.final_cost:.10f}\n"
@@ -162,11 +169,9 @@ def print_summary(logs: Processed_Logs, style: Literal["simple", "table", "prett
             f"{'Processed items:':25}{logs.total_items}\n"
             f"{'Success rate (%):':25}{logs.total_success_rate:.2f}\n"
             f"{'Throughput (items/min):':25}{logs.throughput_per_min:.2f}\n"
-            "==========================="
+            "===========================\n"
         )
-        logger.info(output)
-
-    elif style == "pretty":
+    elif settings.style == "pretty":
         summary = [
             ["Final cost", f"{logs.final_cost:.10f}"],
             ["Total LLM calls", logs.total_llm_calls],
@@ -175,11 +180,34 @@ def print_summary(logs: Processed_Logs, style: Literal["simple", "table", "prett
             ["Success rate (%)", f"{logs.total_success_rate:.2f}"],
             ["Throughput (items/min)", f"{logs.throughput_per_min:.2f}"]
         ]
-        logger.info("\n" + tabulate(summary, headers=["Metric", "Value"], tablefmt="pretty"))
-
+        output = tabulate(summary, headers=["Metric", "Value"], tablefmt="pretty")
     else:
-        raise ValueError(f"Unknown style '{style}'. Use 'simple', 'table', or 'pretty'.")
+        raise ValueError(f"Unknown style '{settings.style}'. Use 'simple', 'table', or 'pretty'.")
 
+    report = compose_final_report(settings, output)
+
+    path = save_run_to_file(report, settings.folder, settings.filename)
+    log_str = "*"*30 + " INC ANALYSIS TERMINATED " + "*"*30
+    logger.info(log_str)
+    log_str = "\n" + report
+    logger.info(log_str.center(60))
+    logger.info(f"Run salvato in: {path.resolve()}")
+
+def compose_final_report(settings: AppSettings, output: str) -> str:
+    cfg_dict = settings.model_dump()
+    ts_iso = datetime.now().isoformat(timespec="seconds")
+    cfg_text = json.dumps(cfg_dict, indent=2, ensure_ascii=False)
+    cfg_header = "## Settings (JSON)"
+    report = (
+        "================= INCIDENT ANALYSIS REPORT =================\n"
+        f"Timestamp: {ts_iso}\n"
+        "============================================================\n\n"
+        f"{cfg_header}\n"
+        f"{cfg_text}\n"
+        "## Summary\n"
+        f"{output if output.endswith('\n') else output + '\n'}"
+    )
+    return report
 
 if __name__=="__main__":
     from langchain_community.callbacks import OpenAICallbackHandler

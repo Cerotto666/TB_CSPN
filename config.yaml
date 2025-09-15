@@ -1,0 +1,8 @@
+style: simple
+folder: runs
+filename: null
+llm_call: true
+n_items: 3
+log_level: info
+model: gpt-4o-mini
+temperature: 0.5

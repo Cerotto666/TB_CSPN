@@ -152,13 +152,16 @@ Rules:
 - Choose the tool that best progresses investigation/diagnostics given Incident and Topics.
 - Set confidence in [0,1].
 - Provide a short reason.
+- Create a directive for the selected tool to execute
 - Return ONLY a JSON object with keys:
   {{
     "tool_name": "<one of {available_tools}>",
     "confidence": <float 0..1>,
     "reason": "<short reason>",
+    "directive_text": "<the one sentence directive for tool",
     "args": {{}}   # optional; include only if needed
   }}
 
 Do not add commentary or extra fields.
 """
+
